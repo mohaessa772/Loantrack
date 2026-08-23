@@ -170,47 +170,93 @@ export function TransactionForm() {
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <FormError error={error && !Object.keys(fieldErrors).length ? error : null} />
 
-          {/* Type is the most consequential choice on this form, so it gets the
-              largest, most obvious control rather than a dropdown. */}
+          {/* Type is the most consequential choice on this form - getting it
+              wrong turns money you received into money you gave away. So it is
+              the first thing on the page, it is large, and you can switch
+              between the two without leaving the form or losing what you typed.
+
+              Radio inputs (visually hidden, styled labels on top) rather than
+              buttons: arrow keys move between them, and a screen reader
+              announces "Loan, 1 of 2, selected" for free. */}
           <fieldset>
-            <legend className="mb-2 block text-sm font-medium text-slate-700">
-              Type <span className="text-red-600">*</span>
+            <legend className="mb-2 block text-sm font-semibold text-slate-800">
+              What are you recording? <span className="text-red-600">*</span>
             </legend>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { value: 'LOAN', label: 'Loan', hint: 'I gave money', icon: '↑' },
-                { value: 'PAYMENT', label: 'Payment', hint: 'They paid back', icon: '↓' },
-              ].map((option) => (
-                <label
-                  key={option.value}
-                  className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 p-3 transition ${
-                    form.type === option.value
-                      ? option.value === 'LOAN'
-                        ? 'border-red-500 bg-red-50'
-                        : 'border-emerald-500 bg-emerald-50'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="type"
-                    value={option.value}
-                    checked={form.type === option.value}
-                    onChange={update('type')}
-                    className="sr-only"
-                  />
-                  <span aria-hidden="true" className="text-lg">
-                    {option.icon}
-                  </span>
-                  <span>
-                    <span className="block text-sm font-semibold text-slate-900">
-                      {option.label}
+                {
+                  value: 'LOAN',
+                  label: 'Add loan',
+                  hint: 'I gave them money',
+                  icon: '↑',
+                  active: 'border-red-500 bg-red-50 ring-2 ring-red-500/20',
+                  activeText: 'text-red-800',
+                  chip: 'bg-red-600',
+                },
+                {
+                  value: 'PAYMENT',
+                  label: 'Record payment',
+                  hint: 'They paid me back',
+                  icon: '↓',
+                  active: 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20',
+                  activeText: 'text-emerald-800',
+                  chip: 'bg-emerald-600',
+                },
+              ].map((option) => {
+                const selected = form.type === option.value
+                return (
+                  <label
+                    key={option.value}
+                    className={`relative flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition-all
+                      has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-600 has-[:focus-visible]:ring-offset-2
+                      ${
+                        selected
+                          ? option.active
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      name="type"
+                      value={option.value}
+                      checked={selected}
+                      onChange={update('type')}
+                      className="sr-only"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-base font-bold text-white transition ${
+                        selected ? option.chip : 'bg-slate-300'
+                      }`}
+                    >
+                      {option.icon}
                     </span>
-                    <span className="block text-xs text-slate-500">{option.hint}</span>
-                  </span>
-                </label>
-              ))}
+                    <span className="min-w-0">
+                      <span
+                        className={`block text-sm font-bold ${
+                          selected ? option.activeText : 'text-slate-700'
+                        }`}
+                      >
+                        {option.label}
+                      </span>
+                      <span className="block text-xs text-slate-500">{option.hint}</span>
+                    </span>
+                    {selected && (
+                      <span
+                        aria-hidden="true"
+                        className={`absolute right-3 top-3 text-sm font-bold ${option.activeText}`}
+                      >
+                        ✓
+                      </span>
+                    )}
+                  </label>
+                )
+              })}
             </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Switch between the two at any time — nothing is saved until you press the button at
+              the bottom.
+            </p>
           </fieldset>
 
           <Field label="Person" htmlFor="person_id" required error={fieldErrors.person_id}>
