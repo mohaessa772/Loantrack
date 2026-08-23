@@ -1,7 +1,10 @@
-import { useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useCallback, useState } from 'react'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { api } from '../api/client'
+import { AuthLayout } from '../components/AuthLayout'
+import { Button, Field, FormError, Input, LoadingState } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
-import { Button, Card, Field, FormError, Input, LoadingState } from '../components/ui'
+import { useFetch } from '../hooks/useFetch'
 
 export function Login() {
   const { user, loading, login } = useAuth()
@@ -14,8 +17,12 @@ export function Login() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
 
+  // Whether to offer a "create account" link is the server's decision, not ours.
+  // A link to a form the server would reject is worse than no link.
+  const fetchConfig = useCallback(() => api.authConfig(), [])
+  const { data: config } = useFetch(fetchConfig)
+
   if (loading) return <LoadingState label="Checking your session…" />
-  // Already signed in? Do not show the login form again.
   if (user) return <Navigate to="/" replace />
 
   const handleSubmit = async (event) => {
@@ -35,58 +42,52 @@ export function Login() {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-slate-50 px-4 py-10">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <span className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-brand-600 text-lg font-bold text-white">
-            LT
-          </span>
-          <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">Loan Tracker</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Track what you lent, and what came back.
-          </p>
-        </div>
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Track what you lent, and what came back."
+      footer={
+        config?.allow_registration ? (
+          <>
+            Don&apos;t have an account?{' '}
+            <Link to="/register" className="font-semibold text-brand-700 hover:underline">
+              Create one
+            </Link>
+          </>
+        ) : null
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        <FormError error={error && !Object.keys(fieldErrors).length ? error : null} />
 
-        <Card className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-            <FormError error={error && !Object.keys(fieldErrors).length ? error : null} />
+        <Field label="Email" htmlFor="email" required error={fieldErrors.email}>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={fieldErrors.email}
+            autoComplete="username"
+            placeholder="you@example.com"
+            autoFocus
+          />
+        </Field>
 
-            <Field label="Email" htmlFor="email" required error={fieldErrors.email}>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                error={fieldErrors.email}
-                autoComplete="username"
-                placeholder="you@example.com"
-                autoFocus
-              />
-            </Field>
+        <Field label="Password" htmlFor="password" required error={fieldErrors.password}>
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={fieldErrors.password}
+            autoComplete="current-password"
+            placeholder="••••••••"
+          />
+        </Field>
 
-            <Field label="Password" htmlFor="password" required error={fieldErrors.password}>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                error={fieldErrors.password}
-                autoComplete="current-password"
-                placeholder="••••••••"
-              />
-            </Field>
-
-            <Button type="submit" className="w-full" size="lg" loading={submitting}>
-              Sign in
-            </Button>
-          </form>
-        </Card>
-
-        <p className="mt-6 text-center text-xs text-slate-500">
-          No sign-up form by design. Accounts are created from the command line with{' '}
-          <code className="rounded bg-slate-200 px-1 py-0.5">flask create-user</code>.
-        </p>
-      </div>
-    </div>
+        <Button type="submit" className="w-full" size="lg" loading={submitting}>
+          Sign in
+        </Button>
+      </form>
+    </AuthLayout>
   )
 }

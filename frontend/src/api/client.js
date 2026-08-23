@@ -89,8 +89,11 @@ async function request(path, { method = 'GET', body, params, skipAuthRedirect } 
 export const api = {
   // --- auth ---
   me: () => request('/api/auth/me', { skipAuthRedirect: true }),
+  authConfig: () => request('/api/auth/config', { skipAuthRedirect: true }),
   login: (email, password) =>
     request('/api/auth/login', { method: 'POST', body: { email, password }, skipAuthRedirect: true }),
+  register: (body) =>
+    request('/api/auth/register', { method: 'POST', body, skipAuthRedirect: true }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
 
   // --- dashboard ---

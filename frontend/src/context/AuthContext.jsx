@@ -46,6 +46,14 @@ export function AuthProvider({ children }) {
     return data.user
   }, [])
 
+  const register = useCallback(async (payload) => {
+    // The server signs the new account in as part of registering, so there is
+    // no second round trip here.
+    const data = await api.register(payload)
+    setUser(data.user)
+    return data.user
+  }, [])
+
   const logout = useCallback(async () => {
     try {
       await api.logout()
@@ -59,12 +67,13 @@ export function AuthProvider({ children }) {
       user,
       loading,
       login,
+      register,
       logout,
       refresh,
       setUser,
       currency: user?.currency_code || 'MYR',
     }),
-    [user, loading, login, logout, refresh],
+    [user, loading, login, register, logout, refresh],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
