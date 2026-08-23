@@ -1,0 +1,38 @@
+# --- Secrets ---------------------------------------------------------
+# The single most important line in this file. .env holds SECRET_KEY and the
+# database password. Committing it - even to a private repo - is how real
+# credential leaks happen.
+.env
+.env.*
+!.env.example
+
+# --- Python ----------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Local database --------------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
+# --- Node / frontend -------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# --- Editors / OS ----------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
