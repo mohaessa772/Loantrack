@@ -53,12 +53,8 @@ export function Dashboard() {
         subtitle="Everything you are owed, at a glance."
         actions={
           <>
-            <Link to="/transactions/new?type=PAYMENT">
-              <Button variant="success">↓ Record payment</Button>
-            </Link>
-            <Link to="/transactions/new?type=LOAN">
-              <Button>↑ Add loan</Button>
-            </Link>
+            <Button to="/transactions/new?type=PAYMENT" variant="success">↓ Record payment</Button>
+            <Button to="/transactions/new?type=LOAN">↑ Add loan</Button>
           </>
         }
       />
@@ -70,9 +66,7 @@ export function Dashboard() {
             title="Nothing here yet"
             description="Add the first person you have lent money to, then record the loan."
             action={
-              <Link to="/people">
-                <Button>Add your first person</Button>
-              </Link>
+              <Button to="/people">Add your first person</Button>
             }
           />
         </Card>
@@ -98,11 +92,7 @@ export function Dashboard() {
                   </p>
                 </div>
               </div>
-              <Link to="/people?status=OVERDUE">
-                <Button variant="secondary" size="sm">
-                  Review
-                </Button>
-              </Link>
+              <Button to="/people?status=OVERDUE" variant="secondary" size="sm">Review</Button>
             </div>
           )}
 

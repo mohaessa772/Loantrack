@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { Button } from '../components/ui'
 
 export function NotFound() {
@@ -10,9 +9,9 @@ export function NotFound() {
         <p className="mt-2 text-sm text-slate-500">
           That page does not exist, or it moved.
         </p>
-        <Link to="/" className="mt-6 inline-block">
-          <Button>Back to dashboard</Button>
-        </Link>
+        <Button to="/" className="mt-6">
+          Back to dashboard
+        </Button>
       </div>
     </div>
   )

@@ -125,12 +125,10 @@ export function PersonDetail() {
           </div>
 
           <div className="flex shrink-0 flex-wrap gap-2">
-            <Link to={`/transactions/new?person=${person.id}&type=PAYMENT`}>
-              <Button variant="success">↓ Record payment</Button>
-            </Link>
-            <Link to={`/transactions/new?person=${person.id}&type=LOAN`}>
-              <Button>↑ Add loan</Button>
-            </Link>
+            <Button variant="success" to={`/transactions/new?person=${person.id}&type=PAYMENT`}>
+              ↓ Record payment
+            </Button>
+            <Button to={`/transactions/new?person=${person.id}&type=LOAN`}>↑ Add loan</Button>
           </div>
         </div>
 
@@ -163,16 +161,22 @@ export function PersonDetail() {
           </div>
         </div>
 
-        <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
           <Button variant="secondary" size="sm" onClick={() => setEditingPerson(true)}>
             Edit details
           </Button>
+          {/* target="_blank" so printing happens in its own tab and the person
+              keeps their place in the app. */}
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
-            className="text-red-600 hover:bg-red-50"
-            onClick={() => setDeletingPerson(true)}
+            to={`/people/${person.id}/statement`}
+            target="_blank"
+            rel="noopener noreferrer"
           >
+            🖨 Print statement
+          </Button>
+          <Button variant="dangerGhost" size="sm" onClick={() => setDeletingPerson(true)}>
             Delete person
           </Button>
         </div>
@@ -193,9 +197,7 @@ export function PersonDetail() {
             title="No transactions yet"
             description={`Record the first loan you gave ${person.name}.`}
             action={
-              <Link to={`/transactions/new?person=${person.id}&type=LOAN`}>
-                <Button>↑ Add loan</Button>
-              </Link>
+              <Button to={`/transactions/new?person=${person.id}&type=LOAN`}>↑ Add loan</Button>
             }
           />
         ) : (
@@ -259,15 +261,12 @@ export function PersonDetail() {
                         )}
                       </td>
                       <td className="whitespace-nowrap px-5 py-3 text-right">
-                        <Link to={`/transactions/${txn.id}/edit`}>
-                          <Button variant="ghost" size="sm">
-                            Edit
-                          </Button>
-                        </Link>
+                        <Button variant="ghost" size="sm" to={`/transactions/${txn.id}/edit`}>
+                          Edit
+                        </Button>
                         <Button
-                          variant="ghost"
+                          variant="dangerGhost"
                           size="sm"
-                          className="text-red-600 hover:bg-red-50"
                           onClick={() => setDeletingTxn(txn)}
                         >
                           Delete
@@ -310,15 +309,12 @@ export function PersonDetail() {
                     </div>
                   </div>
                   <div className="mt-3 flex gap-2">
-                    <Link to={`/transactions/${txn.id}/edit`}>
-                      <Button variant="secondary" size="sm">
-                        Edit
-                      </Button>
-                    </Link>
+                    <Button variant="secondary" size="sm" to={`/transactions/${txn.id}/edit`}>
+                      Edit
+                    </Button>
                     <Button
-                      variant="ghost"
+                      variant="dangerGhost"
                       size="sm"
-                      className="text-red-600"
                       onClick={() => setDeletingTxn(txn)}
                     >
                       Delete

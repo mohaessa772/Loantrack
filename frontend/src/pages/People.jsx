@@ -206,12 +206,7 @@ export function People() {
                       <Button variant="ghost" size="sm" onClick={() => setEditing(person)}>
                         Edit
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-600 hover:bg-red-50"
-                        onClick={() => setDeleting(person)}
-                      >
+                      <Button variant="dangerGhost" size="sm" onClick={() => setDeleting(person)}>
                         Delete
                       </Button>
                     </td>
@@ -248,12 +243,7 @@ export function People() {
                   <Button variant="secondary" size="sm" onClick={() => setEditing(person)}>
                     Edit
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-600"
-                    onClick={() => setDeleting(person)}
-                  >
+                  <Button variant="dangerGhost" size="sm" onClick={() => setDeleting(person)}>
                     Delete
                   </Button>
                 </div>

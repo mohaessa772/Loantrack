@@ -104,11 +104,7 @@ export function TransactionHistory() {
       <PageHeader
         title="Transaction history"
         subtitle="Every loan and payment, filterable."
-        actions={
-          <Link to="/transactions/new">
-            <Button>+ New transaction</Button>
-          </Link>
-        }
+        actions={<Button to="/transactions/new">+ New transaction</Button>}
       />
 
       <Card className="mb-4 p-4">
@@ -235,9 +231,7 @@ export function TransactionHistory() {
                   Clear filters
                 </Button>
               ) : (
-                <Link to="/transactions/new">
-                  <Button>+ New transaction</Button>
-                </Link>
+                <Button to="/transactions/new">+ New transaction</Button>
               )
             }
           />
@@ -293,17 +287,10 @@ export function TransactionHistory() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-5 py-3 text-right">
-                      <Link to={`/transactions/${txn.id}/edit`}>
-                        <Button variant="ghost" size="sm">
-                          Edit
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-600 hover:bg-red-50"
-                        onClick={() => setDeleting(txn)}
-                      >
+                      <Button variant="ghost" size="sm" to={`/transactions/${txn.id}/edit`}>
+                        Edit
+                      </Button>
+                      <Button variant="dangerGhost" size="sm" onClick={() => setDeleting(txn)}>
                         Delete
                       </Button>
                     </td>
@@ -338,17 +325,10 @@ export function TransactionHistory() {
                   </p>
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <Link to={`/transactions/${txn.id}/edit`}>
-                    <Button variant="secondary" size="sm">
-                      Edit
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-600"
-                    onClick={() => setDeleting(txn)}
-                  >
+                  <Button variant="secondary" size="sm" to={`/transactions/${txn.id}/edit`}>
+                    Edit
+                  </Button>
+                  <Button variant="dangerGhost" size="sm" onClick={() => setDeleting(txn)}>
                     Delete
                   </Button>
                 </div>

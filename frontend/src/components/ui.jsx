@@ -6,37 +6,91 @@
  * states beginners skip, and they are exactly what makes an app feel finished.
  */
 
+import { Link } from 'react-router-dom'
+
+/**
+ * Button.
+ *
+ * Pass `to` and it renders a react-router <Link> that looks identical. That
+ * matters for more than tidiness: `<a><button></button></a>` is invalid HTML,
+ * and screen readers and keyboards handle a nested control badly. One component
+ * covers both cases so the mistake cannot be made.
+ *
+ * Every variant defines hover, active and focus-visible states. A button that
+ * does not visibly react to being pressed feels broken on a slow connection.
+ */
 const buttonStyles = {
   primary:
-    'bg-brand-600 text-white hover:bg-brand-700 focus-visible:outline-brand-600 shadow-sm',
-  secondary: 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm',
-  danger: 'bg-red-600 text-white hover:bg-red-700 shadow-sm',
-  ghost: 'text-slate-600 hover:bg-slate-100',
-  success: 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm',
+    'bg-brand-600 text-white shadow-sm ring-1 ring-brand-700/20 ' +
+    'hover:bg-brand-700 hover:shadow-md active:bg-brand-700 focus-visible:ring-brand-600',
+  secondary:
+    'bg-white text-slate-700 ring-1 ring-slate-300 shadow-sm ' +
+    'hover:bg-slate-50 hover:ring-slate-400 hover:text-slate-900 active:bg-slate-100 focus-visible:ring-slate-500',
+  success:
+    'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-700/20 ' +
+    'hover:bg-emerald-700 hover:shadow-md active:bg-emerald-700 focus-visible:ring-emerald-600',
+  danger:
+    'bg-red-600 text-white shadow-sm ring-1 ring-red-700/20 ' +
+    'hover:bg-red-700 hover:shadow-md active:bg-red-700 focus-visible:ring-red-600',
+  ghost:
+    'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 ' +
+    'active:bg-slate-200 focus-visible:ring-slate-400',
+  dangerGhost:
+    'bg-transparent text-red-600 hover:bg-red-50 hover:text-red-700 ' +
+    'active:bg-red-100 focus-visible:ring-red-400',
+}
+
+const buttonSizes = {
+  sm: 'h-8 gap-1.5 px-3 text-xs',
+  md: 'h-10 gap-2 px-4 text-sm',
+  lg: 'h-12 gap-2 px-6 text-base',
 }
 
 export function Button({
   variant = 'primary',
   size = 'md',
+  to,
   className = '',
   loading = false,
   children,
   ...props
 }) {
-  const sizes = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-5 py-2.5 text-base',
-  }
-  return (
-    <button
-      className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition
-        disabled:cursor-not-allowed disabled:opacity-50 ${buttonStyles[variant]} ${sizes[size]} ${className}`}
-      disabled={loading || props.disabled}
-      {...props}
-    >
+  const classes = [
+    'inline-flex shrink-0 select-none items-center justify-center whitespace-nowrap rounded-lg',
+    'font-semibold transition-all duration-150',
+    // active:translate-y-px is the press: the button physically moves under the
+    // cursor, which is what makes a click feel like a click.
+    'active:translate-y-px',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+    'disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none',
+    buttonStyles[variant],
+    buttonSizes[size],
+    className,
+  ].join(' ')
+
+  const content = (
+    <>
       {loading && <Spinner size="sm" />}
       {children}
+    </>
+  )
+
+  if (to) {
+    return (
+      <Link to={to} className={classes} {...props}>
+        {content}
+      </Link>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      className={classes}
+      {...props}
+      disabled={loading || props.disabled}
+    >
+      {content}
     </button>
   )
 }
