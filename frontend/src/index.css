@@ -34,3 +34,36 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* --- Printing --------------------------------------------------------
+   Anything marked .no-print is a screen control (buttons, navigation) and
+   should never appear on paper. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  /* Repeat the table header on every page of a long statement. */
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  img {
+    break-inside: avoid;
+  }
+
+  a[href]::after {
+    /* Do not append raw URLs after links - it is noise on a printed page. */
+    content: none;
+  }
+}
+
+@page {
+  size: A4;
+  margin: 16mm;
+}

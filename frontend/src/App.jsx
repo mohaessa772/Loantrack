@@ -6,6 +6,8 @@ import { Login } from './pages/Login'
 import { NotFound } from './pages/NotFound'
 import { People } from './pages/People'
 import { PersonDetail } from './pages/PersonDetail'
+import { PrintStatement } from './pages/PrintStatement'
+import { Register } from './pages/Register'
 import { Settings } from './pages/Settings'
 import { TransactionForm } from './pages/TransactionForm'
 import { TransactionHistory } from './pages/TransactionHistory'
@@ -21,6 +23,18 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+
+      {/* Protected, but outside <Layout> - a statement meant for printing must
+          not carry the app's sidebar and navigation. */}
+      <Route
+        path="/people/:id/statement"
+        element={
+          <ProtectedRoute>
+            <PrintStatement />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         element={
