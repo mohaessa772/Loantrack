@@ -116,3 +116,89 @@ class TestOwnership:
 
         assert client.get(f"/api/people/{theirs.id}").status_code == 404
         assert client.get("/api/people").get_json()["people"].__len__() == 1
+
+
+class TestRegistration:
+    """DESIGN DECISION Q4 (revised): public sign-up, switchable off in config."""
+
+    VALID = {
+        "email": "newuser@example.com",
+        "password": "a-good-password",
+        "confirm_password": "a-good-password",
+        "display_name": "New User",
+        "currency_code": "MYR",
+    }
+
+    def test_register_creates_an_account(self, anon_client):
+        response = anon_client.post("/api/auth/register", json=self.VALID)
+        assert response.status_code == 201
+        assert response.get_json()["user"]["email"] == "newuser@example.com"
+
+    def test_register_signs_you_in_immediately(self, anon_client):
+        anon_client.post("/api/auth/register", json=self.VALID)
+        assert anon_client.get("/api/dashboard").status_code == 200
+
+    def test_password_is_hashed(self, anon_client, db):
+        anon_client.post("/api/auth/register", json=self.VALID)
+        account = User.query.filter_by(email="newuser@example.com").first()
+        assert account.password_hash != self.VALID["password"]
+        assert account.check_password(self.VALID["password"]) is True
+
+    def test_email_is_normalised_to_lowercase(self, anon_client):
+        anon_client.post("/api/auth/register", json={**self.VALID, "email": "MiXeD@Example.COM"})
+        assert User.query.filter_by(email="mixed@example.com").first() is not None
+
+    def test_duplicate_email_is_409(self, anon_client, user):
+        response = anon_client.post("/api/auth/register", json={**self.VALID, "email": TEST_EMAIL})
+        assert response.status_code == 409
+        assert "email" in response.get_json()["error"]["fields"]
+
+    def test_duplicate_is_case_insensitive(self, anon_client, user):
+        response = anon_client.post(
+            "/api/auth/register", json={**self.VALID, "email": TEST_EMAIL.upper()}
+        )
+        assert response.status_code == 409
+
+    def test_short_password_is_rejected(self, anon_client):
+        response = anon_client.post(
+            "/api/auth/register",
+            json={**self.VALID, "password": "short", "confirm_password": "short"},
+        )
+        assert response.status_code == 422
+        assert "password" in response.get_json()["error"]["fields"]
+
+    def test_invalid_email_is_rejected(self, anon_client):
+        response = anon_client.post("/api/auth/register", json={**self.VALID, "email": "not-email"})
+        assert response.status_code == 422
+
+    def test_mismatched_confirmation_is_rejected(self, anon_client):
+        """Checked server-side too - the React form can be bypassed entirely."""
+        response = anon_client.post(
+            "/api/auth/register", json={**self.VALID, "confirm_password": "something-else"}
+        )
+        assert response.status_code == 422
+        assert "confirm_password" in response.get_json()["error"]["fields"]
+
+    def test_unsupported_currency_is_rejected(self, anon_client):
+        response = anon_client.post(
+            "/api/auth/register", json={**self.VALID, "currency_code": "ZZZ"}
+        )
+        assert response.status_code == 422
+
+    def test_a_new_account_starts_empty(self, anon_client, user, person):
+        """The critical isolation check: a brand new user must not see the
+        existing user's people, even though both rows live in one table."""
+        anon_client.post("/api/auth/register", json=self.VALID)
+        assert anon_client.get("/api/people").get_json()["people"] == []
+        assert anon_client.get("/api/dashboard").get_json()["totals"]["outstanding"] == "0.00"
+
+    def test_registration_can_be_switched_off(self, app, anon_client):
+        app.config["ALLOW_REGISTRATION"] = False
+        response = anon_client.post("/api/auth/register", json=self.VALID)
+        assert response.status_code == 403
+        assert response.get_json()["error"]["code"] == "REGISTRATION_DISABLED"
+
+    def test_config_endpoint_reports_the_setting(self, app, anon_client):
+        assert anon_client.get("/api/auth/config").get_json()["allow_registration"] is True
+        app.config["ALLOW_REGISTRATION"] = False
+        assert anon_client.get("/api/auth/config").get_json()["allow_registration"] is False

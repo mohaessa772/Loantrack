@@ -10,6 +10,7 @@ with Postman or curl and skip the UI entirely. Frontend validation is a
 convenience for honest users; backend validation is the actual rule.
 """
 
+import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
@@ -49,6 +50,39 @@ def clean_str(value, max_length=None):
     if max_length and len(text) > max_length:
         text = text[:max_length]
     return text
+
+
+# Deliberately loose. The only way to truly verify an address is to send mail to
+# it; a stricter regex mostly succeeds at rejecting valid unusual addresses.
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s.]+\.[^@\s]+$")
+
+
+def parse_email(value, errors, field="email"):
+    email = clean_str(value, 255)
+    if not email:
+        errors.add(field, "Email is required.")
+        return None
+    email = email.lower()
+    if not EMAIL_PATTERN.match(email):
+        errors.add(field, "That does not look like an email address.")
+        return None
+    return email
+
+
+def parse_new_password(value, errors, field="password", minimum=8):
+    """Rules for a password being *set* (not one being checked at login).
+
+    Length is the requirement that actually matters. Forcing symbols and mixed
+    case mostly produces "Password1!" - predictable, and hard to remember.
+    """
+    password = value or ""
+    if len(password) < minimum:
+        errors.add(field, f"Password must be at least {minimum} characters.")
+        return None
+    if len(password) > 200:
+        errors.add(field, "Password is too long.")
+        return None
+    return password
 
 
 def parse_required_name(value, errors, field="name"):

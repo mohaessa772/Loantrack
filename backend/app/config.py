@@ -63,6 +63,12 @@ class Config:
     # --- Business rules -------------------------------------------------
     DEFAULT_CURRENCY = os.environ.get("DEFAULT_CURRENCY", "MYR")
 
+    # Public sign-up. Convenient while you are building, but it means anyone who
+    # reaches the URL can create an account. Set ALLOW_REGISTRATION=false in .env
+    # once your own account exists and the app is on the public internet - the
+    # CLI (`flask --app run.py create-user`) still works when it is off.
+    ALLOW_REGISTRATION = _bool("ALLOW_REGISTRATION", True)
+
     # Login throttling: how many failed attempts before we make the caller wait.
     LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "10"))
     LOGIN_LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "300"))
