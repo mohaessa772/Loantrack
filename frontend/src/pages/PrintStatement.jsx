@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../api/client'
+import loantrackLogo from '../assets/loantrack-logo.webp'
 import { Button, ErrorState, LoadingState } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useFetch } from '../hooks/useFetch'
@@ -54,20 +55,18 @@ export function PrintStatement() {
       </div>
 
       <article className="mx-auto max-w-[820px] bg-white p-10 shadow-lg print:max-w-none print:p-0 print:shadow-none">
-        <header className="flex items-start justify-between border-b-2 border-slate-900 pb-5">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Account Statement
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Issued by {user?.display_name || 'Loan Tracker'}
-            </p>
-          </div>
-          <div className="text-right text-sm text-slate-600">
-            <p className="font-semibold text-slate-900">Loan Tracker</p>
-            <p>Generated {formatDate(new Date().toISOString())}</p>
-            <p>All amounts in {currency}</p>
-          </div>
+        <header className="border-b-2 border-slate-900 pb-5 text-center">
+          <img
+            src={loantrackLogo}
+            alt="LoanTrack — Loan &amp; Debt Tracker"
+            className="mx-auto h-24 w-auto"
+          />
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
+            Account Statement
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Issued by {user?.display_name || 'Loan Tracker'}
+          </p>
         </header>
 
         <section className="mt-6 grid grid-cols-2 gap-6">
