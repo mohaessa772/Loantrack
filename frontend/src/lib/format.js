@@ -44,6 +44,14 @@ export function formatDate(iso) {
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+/** "24 August 2026" - the full form, for document headings rather than tables. */
+export function formatDateLong(iso) {
+  if (!iso) return '-'
+  const date = new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 export function formatDateShort(iso) {
   if (!iso) return '-'
   const date = new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso)

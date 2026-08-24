@@ -5,7 +5,16 @@ import loantrackLogo from '../assets/loantrack-logo.webp'
 import { Button, ErrorState, LoadingState } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { useFetch } from '../hooks/useFetch'
-import { PAYMENT_METHOD_LABELS, formatDate, formatMoney } from '../lib/format'
+import { PAYMENT_METHOD_LABELS, formatDate, formatDateLong, formatMoney } from '../lib/format'
+
+// Wording for the status the server sends. The *rule* that decides which one
+// applies lives in services/balances.resolve_status - these are only labels.
+const STATUS_LABELS = {
+  SETTLED: 'Settled',
+  OWING: 'Owing',
+  OVERDUE: 'Overdue',
+  CREDIT: 'In credit',
+}
 
 /**
  * A printable account statement for one person.
@@ -26,15 +35,21 @@ export function PrintStatement() {
   const fetcher = useCallback(() => api.personStatement(id), [id])
   const { data, error, loading, reload } = useFetch(fetcher)
 
+  // The Owing / Settled / Overdue status is decided on the server. Fetching it
+  // rather than re-deriving it here keeps one definition of the rule.
+  const fetchPerson = useCallback(() => api.getPerson(id), [id])
+  const { data: personData, loading: personLoading } = useFetch(fetchPerson)
+
   // Open the print dialog automatically once - but only after the data is on
-  // screen, otherwise the browser would print a loading spinner.
+  // screen, otherwise the browser would print a loading spinner. It waits for
+  // the status too, so the printed page is never missing it.
   useEffect(() => {
-    if (data && !printed.current) {
+    if (data && !personLoading && !printed.current) {
       printed.current = true
       const timer = setTimeout(() => window.print(), 400)
       return () => clearTimeout(timer)
     }
-  }, [data])
+  }, [data, personLoading])
 
   if (loading) return <LoadingState label="Preparing statement…" />
   if (error) return <ErrorState error={error} onRetry={reload} />
@@ -42,6 +57,7 @@ export function PrintStatement() {
 
   const { person, totals, transactions } = data
   const money = (value) => formatMoney(value, currency)
+  const status = personData?.person?.status
   // The API returns newest first; a statement reads oldest first, like a bank's.
   const chronological = [...transactions].reverse()
 
@@ -55,11 +71,14 @@ export function PrintStatement() {
       </div>
 
       <article className="mx-auto max-w-[820px] bg-white p-10 shadow-lg print:max-w-none print:p-0 print:shadow-none">
-        <header className="border-b-2 border-slate-900 pb-5 text-center">
+        {/* border-blue-800 is the one strong brand accent on the page - the rule
+            under the logo. Everything else stays black on white so the document
+            still reads correctly from a monochrome printer. */}
+        <header className="border-b-2 border-blue-800 pb-5 text-center">
           <img
             src={loantrackLogo}
             alt="LoanTrack — Loan &amp; Debt Tracker"
-            className="mx-auto h-24 w-auto"
+            className="mx-auto h-24 w-auto print:h-20"
           />
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
             Account Statement
@@ -67,11 +86,14 @@ export function PrintStatement() {
           <p className="mt-1 text-sm text-slate-600">
             Issued by {user?.display_name || 'Loan Tracker'}
           </p>
+          <p className="text-sm text-slate-600">
+            Statement date: {formatDateLong(new Date().toISOString())}
+          </p>
         </header>
 
         <section className="mt-6 grid grid-cols-2 gap-6">
           <div>
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-blue-800">
               Statement for
             </h2>
             <p className="mt-1 text-lg font-semibold text-slate-900">{person.name}</p>
@@ -79,27 +101,29 @@ export function PrintStatement() {
             {person.notes && <p className="mt-1 text-sm text-slate-500">{person.notes}</p>}
           </div>
           <div className="text-right">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-blue-800">
               Balance outstanding
             </h2>
             <p className="tabular mt-1 text-3xl font-bold text-slate-900">
               {money(totals.outstanding)}
             </p>
-            <p className="text-sm text-slate-600">
-              {Number(totals.outstanding) > 0 ? 'Amount still owed' : 'Fully settled'}
+            {/* Deliberately plain text, not a coloured badge: the word alone
+                carries the meaning, and it survives a black-and-white print. */}
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-700">
+              Status: {STATUS_LABELS[status] || (Number(totals.outstanding) > 0 ? 'Owing' : 'Settled')}
             </p>
           </div>
         </section>
 
         <section className="mt-6 grid grid-cols-3 border border-slate-300">
           <div className="border-r border-slate-300 p-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total lent</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-blue-800">Total lent</p>
             <p className="tabular mt-1 text-lg font-bold text-slate-900">
               {money(totals.total_lent)}
             </p>
           </div>
           <div className="border-r border-slate-300 p-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <p className="text-xs font-bold uppercase tracking-wider text-blue-800">
               Total repaid
             </p>
             <p className="tabular mt-1 text-lg font-bold text-slate-900">
@@ -107,7 +131,7 @@ export function PrintStatement() {
             </p>
           </div>
           <div className="p-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <p className="text-xs font-bold uppercase tracking-wider text-blue-800">
               Transactions
             </p>
             <p className="tabular mt-1 text-lg font-bold text-slate-900">{transactions.length}</p>
@@ -115,7 +139,7 @@ export function PrintStatement() {
         </section>
 
         <section className="mt-8">
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-700">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-blue-800">
             Transaction history
           </h2>
 
