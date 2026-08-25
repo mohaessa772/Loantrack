@@ -36,3 +36,6 @@ dist-ssr/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Design mockup working files (the canvas is published online)
+design-canvas/
