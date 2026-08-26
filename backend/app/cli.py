@@ -26,13 +26,21 @@ def register_cli(app):
 @click.command("init-db")
 @with_appcontext
 def init_db():
-    """Create all tables. Use this for a quick start with SQLite.
+    """Bring the database schema up to date by running the migrations.
 
-    On a real deployment you would use migrations instead (`flask db upgrade`),
-    because create_all() cannot evolve a schema that already has data in it.
+    This replaces the old create_all() call. create_all() can only CREATE tables
+    that do not exist yet - it cannot ALTER one that already holds data, so the
+    moment you add a column it leaves you choosing between losing your records
+    and writing SQL by hand.
+
+    Migrations solve that: each schema change is a numbered file, and Alembic
+    records which ones a database has already run. Safe on an empty database and
+    on one with years of transactions in it.
     """
-    db.create_all()
-    click.secho("Tables created.", fg="green")
+    from flask_migrate import upgrade
+
+    upgrade()
+    click.secho("Database schema is up to date.", fg="green")
 
 
 @click.command("create-user")
