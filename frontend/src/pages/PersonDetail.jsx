@@ -124,11 +124,24 @@ export function PersonDetail() {
 
   const handleDeleteTxn = async () => {
     setPending(true)
+    const target = deletingTxn
     try {
-      await api.deleteTransaction(deletingTxn.id)
-      toast.success('Transaction deleted.')
+      await api.deleteTransaction(target.id)
       setDeletingTxn(null)
       reloadAll()
+      // Offered right here, because this is the moment you realise it was wrong.
+      toast.success('Transaction deleted.', {
+        label: 'Undo',
+        onClick: async () => {
+          try {
+            await api.restoreTransaction(target.id)
+            toast.success('Transaction restored.')
+            reloadAll()
+          } catch (err) {
+            toast.error(err.message)
+          }
+        },
+      })
     } catch (err) {
       toast.error(err.message)
     } finally {

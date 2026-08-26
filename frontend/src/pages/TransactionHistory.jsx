@@ -136,11 +136,23 @@ export function TransactionHistory() {
 
   const handleDelete = async () => {
     setPending(true)
+    const target = deleting
     try {
-      await api.deleteTransaction(deleting.id)
-      toast.success('Transaction deleted.')
+      await api.deleteTransaction(target.id)
       setDeleting(null)
       reload()
+      toast.success('Transaction deleted.', {
+        label: 'Undo',
+        onClick: async () => {
+          try {
+            await api.restoreTransaction(target.id)
+            toast.success('Transaction restored.')
+            reload()
+          } catch (err) {
+            toast.error(err.message)
+          }
+        },
+      })
     } catch (err) {
       toast.error(err.message)
     } finally {

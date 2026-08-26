@@ -113,7 +113,14 @@ export const api = {
   createTransaction: (body) => request('/api/transactions', { method: 'POST', body }),
   updateTransaction: (id, body) => request(`/api/transactions/${id}`, { method: 'PUT', body }),
   deleteTransaction: (id) => request(`/api/transactions/${id}`, { method: 'DELETE' }),
+  deletedTransactions: () => request('/api/transactions/deleted'),
+  restoreTransaction: (id) => request(`/api/transactions/${id}/restore`, { method: 'POST' }),
   dueTransactions: (days) => request('/api/transactions/due', { params: { days } }),
+
+  // --- backup ---
+  downloadBackup: () => request('/api/backup'),
+  restoreBackup: (data, mode) =>
+    request('/api/backup/restore', { method: 'POST', body: { data, mode } }),
 
   // --- settings ---
   getSettings: () => request('/api/settings'),
