@@ -146,6 +146,25 @@ def delete_transaction(transaction_id):
     return "", 204
 
 
+@transactions_bp.get("/deleted")
+@login_required
+def list_deleted_transactions():
+    """Recently deleted transactions, so a mis-click is recoverable.
+
+    Route order is safe: "/deleted" cannot match "/<int:transaction_id>",
+    because the int converter only accepts digits.
+    """
+    rows = transaction_service.list_deleted(current_user.id)
+    return jsonify({"transactions": [t.to_dict() for t in rows]}), 200
+
+
+@transactions_bp.post("/<int:transaction_id>/restore")
+@login_required
+def restore_transaction(transaction_id):
+    txn = transaction_service.restore_transaction(current_user.id, transaction_id)
+    return jsonify({"transaction": txn.to_dict()}), 200
+
+
 @transactions_bp.get("/due")
 @login_required
 def due_transactions():

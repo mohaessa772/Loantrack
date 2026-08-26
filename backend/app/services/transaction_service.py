@@ -7,7 +7,7 @@ from sqlalchemy import or_
 from ..errors import NotFoundError, ValidationError
 from ..extensions import db
 from ..models import Transaction, TransactionType
-from ..money import ZERO, money_str
+from ..money import ZERO, money_str, to_money
 from .balances import person_totals
 from .people_service import get_owned_person
 
@@ -155,6 +155,43 @@ def delete_transaction(user_id, transaction_id) -> None:
     txn = get_owned_transaction(user_id, transaction_id)
     txn.deleted_at = datetime.now(timezone.utc)
     db.session.commit()
+
+
+def list_deleted(user_id, limit=50):
+    """Soft-deleted transactions, most recently deleted first.
+
+    This is the other half of delete_transaction: stamping deleted_at only
+    protects you if there is a way to read those rows back.
+    """
+    return (
+        Transaction.query.filter(
+            Transaction.user_id == user_id,
+            Transaction.deleted_at.isnot(None),
+        )
+        .order_by(Transaction.deleted_at.desc(), Transaction.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def restore_transaction(user_id, transaction_id) -> Transaction:
+    """Bring a soft-deleted transaction back into the balance.
+
+    A restored payment has to pass the overpayment rule again: while it was
+    deleted the balance may have moved, and putting it back could push the
+    person below zero. Restoring is a normal write, not a privileged one.
+    """
+    txn = get_owned_transaction(user_id, transaction_id, include_deleted=True)
+    if txn.deleted_at is None:
+        return txn  # already live; restoring twice is harmless
+
+    if txn.type == TransactionType.PAYMENT:
+        person = get_owned_person(user_id, txn.person_id)
+        _check_overpayment(user_id, person, to_money(txn.amount))
+
+    txn.deleted_at = None
+    db.session.commit()
+    return txn
 
 
 # =======================================================================

@@ -280,3 +280,68 @@ class TestDashboard:
         body = client.get("/api/dashboard").get_json()
         assert body["totals"]["outstanding"] == "0.00"
         assert body["counts"]["people"] == 0
+
+
+class TestRestoreDeleted:
+    """Soft delete is only a safety net if there is a way back."""
+
+    def test_deleted_transaction_appears_in_the_deleted_list(self, client, person):
+        created = client.post("/api/transactions", json=payload(person)).get_json()["transaction"]
+        client.delete(f"/api/transactions/{created['id']}")
+
+        body = client.get("/api/transactions/deleted").get_json()
+        assert [t["id"] for t in body["transactions"]] == [created["id"]]
+        assert body["transactions"][0]["deleted_at"] is not None
+
+    def test_live_transactions_are_not_in_the_deleted_list(self, client, person):
+        client.post("/api/transactions", json=payload(person))
+        assert client.get("/api/transactions/deleted").get_json()["transactions"] == []
+
+    def test_restore_puts_it_back_into_the_balance(self, client, person):
+        created = client.post(
+            "/api/transactions", json=payload(person, amount="1000")
+        ).get_json()["transaction"]
+        client.delete(f"/api/transactions/{created['id']}")
+        assert client.get(f"/api/people/{person.id}").get_json()["person"]["outstanding"] == "0.00"
+
+        response = client.post(f"/api/transactions/{created['id']}/restore")
+        assert response.status_code == 200
+        assert response.get_json()["transaction"]["deleted_at"] is None
+        assert (
+            client.get(f"/api/people/{person.id}").get_json()["person"]["outstanding"]
+            == "1000.00"
+        )
+
+    def test_restored_transaction_is_readable_again(self, client, person):
+        created = client.post("/api/transactions", json=payload(person)).get_json()["transaction"]
+        client.delete(f"/api/transactions/{created['id']}")
+        assert client.get(f"/api/transactions/{created['id']}").status_code == 404
+
+        client.post(f"/api/transactions/{created['id']}/restore")
+        assert client.get(f"/api/transactions/{created['id']}").status_code == 200
+
+    def test_restoring_twice_is_harmless(self, client, person):
+        created = client.post("/api/transactions", json=payload(person)).get_json()["transaction"]
+        client.delete(f"/api/transactions/{created['id']}")
+        assert client.post(f"/api/transactions/{created['id']}/restore").status_code == 200
+        assert client.post(f"/api/transactions/{created['id']}/restore").status_code == 200
+
+    def test_restore_rechecks_the_overpayment_rule(self, client, person):
+        """While a payment sits deleted the balance can move underneath it."""
+        client.post("/api/transactions", json=payload(person, amount="1000"))
+        first = client.post(
+            "/api/transactions", json=payload(person, type="PAYMENT", amount="300")
+        ).get_json()["transaction"]
+
+        client.delete(f"/api/transactions/{first['id']}")
+        # The whole balance is now cleared by a different payment.
+        client.post("/api/transactions", json=payload(person, type="PAYMENT", amount="1000"))
+
+        response = client.post(f"/api/transactions/{first['id']}/restore")
+        assert response.status_code == 422
+        assert (
+            client.get(f"/api/people/{person.id}").get_json()["person"]["outstanding"] == "0.00"
+        )
+
+    def test_unknown_transaction_is_404(self, client):
+        assert client.post("/api/transactions/999999/restore").status_code == 404
