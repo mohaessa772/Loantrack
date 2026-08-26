@@ -29,14 +29,6 @@ export function formatMoney(amount, currency = 'MYR') {
   }
 }
 
-/** "1,234.56" - for table columns where the currency symbol would be repetitive. */
-export function formatAmount(amount) {
-  return Number(amount ?? 0).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
-
 export function formatDate(iso) {
   if (!iso) return '-'
   const date = new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso)
@@ -50,13 +42,6 @@ export function formatDateLong(iso) {
   const date = new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso)
   if (Number.isNaN(date.getTime())) return iso
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-export function formatDateShort(iso) {
-  if (!iso) return '-'
-  const date = new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
 }
 
 export function todayISO() {
