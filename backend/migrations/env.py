@@ -3,6 +3,12 @@ from logging.config import fileConfig
 
 from flask import current_app
 
+from app.migration_safety import (
+    assert_no_foreign_key_violations,
+    backup_sqlite_database,
+    foreign_key_violations,
+)
+
 from alembic import context
 
 # this is the Alembic Config object, which provides
@@ -112,8 +118,17 @@ def run_migrations_online():
         # deletion.
         # ------------------------------------------------------------------
         is_sqlite = connection.dialect.name == "sqlite"
+
+        # A copy is taken BEFORE anything is configured or run. If it cannot be
+        # made, this raises and the migration never starts.
+        backup_path = backup_sqlite_database(connection)
+
         if is_sqlite:
             connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+
+        # Counted before anything runs, so the report can tell the difference
+        # between damage this migration did and damage it inherited.
+        violations_before = len(foreign_key_violations(connection))
 
         context.configure(
             connection=connection,
@@ -124,16 +139,40 @@ def run_migrations_online():
         try:
             with context.begin_transaction():
                 context.run_migrations()
+
+                # Inside the transaction, so raising aborts the migration
+                # rather than reporting a problem after it has been recorded
+                # as applied. PRAGMA foreign_key_check inspects without
+                # enforcing, so it works with enforcement still switched off.
+                assert_no_foreign_key_violations(
+                    connection, backup_path, pre_existing=violations_before
+                )
+
+            # Commit explicitly.
+            #
+            # Alembic sets transactional_ddl=False for SQLite, so
+            # begin_transaction() above is a no-op context that commits nothing.
+            # Meanwhile PRAGMA foreign_keys=OFF has already opened an implicit
+            # transaction on this connection. Without this commit, closing the
+            # connection rolls the whole migration back and it silently does
+            # nothing at all - the command reports "Running upgrade..." and the
+            # schema never changes.
+            if connection.in_transaction():
+                connection.commit()
+        except Exception:
+            try:
+                connection.rollback()
+            except Exception:  # noqa: BLE001 - never mask the original failure
+                logger.error("Rollback after a failed migration did not succeed.")
+            if backup_path:
+                logger.error("Migration failed. Pre-migration backup: %s", backup_path)
+            raise
         finally:
             if is_sqlite:
-                # Re-checked here rather than just switched back on: if a
-                # migration did break a reference, it should be loud.
+                # Enforcement back on for whoever uses this connection next.
+                # Outside the transaction, because the pragma is a no-op inside
+                # one.
                 connection.exec_driver_sql("PRAGMA foreign_keys=ON")
-                broken = connection.exec_driver_sql(
-                    "PRAGMA foreign_key_check"
-                ).fetchall()
-                if broken:
-                    logger.error("Foreign key violations after migration: %s", broken)
 
 
 if context.is_offline_mode():
