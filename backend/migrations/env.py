@@ -97,14 +97,43 @@ def run_migrations_online():
     connectable = get_engine()
 
     with connectable.connect() as connection:
+        # ------------------------------------------------------------------
+        # SQLite: foreign keys MUST be off while migrations run.
+        #
+        # SQLite cannot ALTER most things, so Alembic uses "batch" mode: it
+        # creates a new table, copies the rows across, DROPS the original and
+        # renames. The app turns on PRAGMA foreign_keys, and with it on that
+        # DROP fires every ON DELETE CASCADE pointing at the table - so
+        # altering `users` silently deletes every person and transaction.
+        #
+        # This is not hypothetical. It happened, and it cost a full database.
+        # Turning the pragma off for the duration of the migration makes the
+        # table rebuild what it is meant to be: a structural change, not a
+        # deletion.
+        # ------------------------------------------------------------------
+        is_sqlite = connection.dialect.name == "sqlite"
+        if is_sqlite:
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+
         context.configure(
             connection=connection,
             target_metadata=get_metadata(),
             **conf_args
         )
 
-        with context.begin_transaction():
-            context.run_migrations()
+        try:
+            with context.begin_transaction():
+                context.run_migrations()
+        finally:
+            if is_sqlite:
+                # Re-checked here rather than just switched back on: if a
+                # migration did break a reference, it should be loud.
+                connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+                broken = connection.exec_driver_sql(
+                    "PRAGMA foreign_key_check"
+                ).fetchall()
+                if broken:
+                    logger.error("Foreign key violations after migration: %s", broken)
 
 
 if context.is_offline_mode():

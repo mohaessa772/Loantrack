@@ -345,3 +345,64 @@ class TestRestoreDeleted:
 
     def test_unknown_transaction_is_404(self, client):
         assert client.post("/api/transactions/999999/restore").status_code == 404
+
+
+class TestOverpaymentSetting:
+    """DESIGN DECISION Q1, revised: blocking overpayment is now the user's call."""
+
+    def enable(self, client):
+        response = client.put(
+            "/api/settings",
+            json={"display_name": "Tester", "currency_code": "MYR", "allow_overpayment": True},
+        )
+        assert response.status_code == 200
+
+    def test_off_by_default(self, client):
+        assert client.get("/api/settings").get_json()["settings"]["allow_overpayment"] is False
+
+    def test_enabling_it_allows_a_larger_payment(self, client, person):
+        client.post("/api/transactions", json=payload(person, amount="1000"))
+        self.enable(client)
+
+        response = client.post(
+            "/api/transactions", json=payload(person, type="PAYMENT", amount="1200")
+        )
+        assert response.status_code == 201
+
+    def test_the_person_then_shows_as_in_credit(self, client, person):
+        client.post("/api/transactions", json=payload(person, amount="1000"))
+        self.enable(client)
+        client.post("/api/transactions", json=payload(person, type="PAYMENT", amount="1200"))
+
+        body = client.get(f"/api/people/{person.id}").get_json()["person"]
+        assert body["outstanding"] == "-200.00"
+        assert body["status"] == "CREDIT"
+
+    def test_turning_it_back_off_blocks_new_overpayments(self, client, person):
+        client.post("/api/transactions", json=payload(person, amount="1000"))
+        self.enable(client)
+        client.put(
+            "/api/settings",
+            json={"display_name": "Tester", "currency_code": "MYR", "allow_overpayment": False},
+        )
+        response = client.post(
+            "/api/transactions", json=payload(person, type="PAYMENT", amount="1200")
+        )
+        assert response.status_code == 422
+
+    def test_omitting_the_field_leaves_it_alone(self, client):
+        """A client that predates the setting must not silently switch it off."""
+        self.enable(client)
+        client.put("/api/settings", json={"display_name": "Tester", "currency_code": "MYR"})
+        assert client.get("/api/settings").get_json()["settings"]["allow_overpayment"] is True
+
+    def test_backup_restore_respects_the_setting(self, client, person):
+        """A negative balance is legitimate once overpayment is allowed, so the
+        restore guard must not reject it."""
+        client.post("/api/transactions", json=payload(person, amount="1000"))
+        self.enable(client)
+        client.post("/api/transactions", json=payload(person, type="PAYMENT", amount="1200"))
+
+        backup = client.get("/api/backup").get_json()
+        response = client.post("/api/backup/restore", json={"data": backup, "mode": "replace"})
+        assert response.status_code == 200

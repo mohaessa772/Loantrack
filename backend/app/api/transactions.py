@@ -3,7 +3,7 @@
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from ..services import transaction_service
+from ..services import audit_service, transaction_service
 from ..validators import (
     FieldErrors,
     clean_str,
@@ -163,6 +163,21 @@ def list_deleted_transactions():
 def restore_transaction(transaction_id):
     txn = transaction_service.restore_transaction(current_user.id, transaction_id)
     return jsonify({"transaction": txn.to_dict()}), 200
+
+
+@transactions_bp.get("/<int:transaction_id>/history")
+@login_required
+def transaction_history(transaction_id):
+    """What has happened to this transaction, newest first.
+
+    include_deleted so the history of a deleted row is still readable - that is
+    often exactly when you want it.
+    """
+    transaction_service.get_owned_transaction(
+        current_user.id, transaction_id, include_deleted=True
+    )
+    rows = audit_service.history_for(current_user.id, transaction_id)
+    return jsonify({"history": [row.to_dict() for row in rows]}), 200
 
 
 @transactions_bp.get("/due")

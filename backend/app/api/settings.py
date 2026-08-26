@@ -38,6 +38,7 @@ def get_settings():
                     "display_name": current_user.display_name,
                     "email": current_user.email,
                     "currency_code": current_user.currency_code,
+                    "allow_overpayment": current_user.allow_overpayment,
                 },
                 "supported_currencies": [
                     {"code": code, "name": name}
@@ -67,6 +68,10 @@ def update_settings():
 
     current_user.display_name = display_name
     current_user.currency_code = currency
+    # Absent means "leave it alone", so a client that does not know about this
+    # preference cannot silently switch it off.
+    if "allow_overpayment" in data:
+        current_user.allow_overpayment = bool(data.get("allow_overpayment"))
     db.session.commit()
 
     return jsonify({"settings": current_user.to_dict()}), 200

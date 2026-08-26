@@ -6,22 +6,11 @@ from sqlalchemy import or_
 
 from ..errors import NotFoundError, ValidationError
 from ..extensions import db
-from ..models import Transaction, TransactionType
+from ..models import AuditAction, Transaction, TransactionType, User
 from ..money import ZERO, money_str, to_money
+from . import audit_service
 from .balances import person_totals
 from .people_service import get_owned_person
-
-# DESIGN DECISION (Q1): a payment larger than what the person still owes is
-# rejected with 422.
-#
-# Reasoning: in a personal tracker an "overpayment" is almost always a typo -
-# an extra zero, or the wrong person selected in the dropdown. Rejecting it
-# turns silent data corruption into a visible error message.
-#
-# Trade-off: if you genuinely receive more than you are owed, you cannot record
-# it directly. Flip this to False and the app will allow negative balances
-# (a CREDIT status already exists for that case).
-ALLOW_OVERPAYMENT = False
 
 # How far in the future a transaction may be dated. Stops "2206-08-21" typos
 # from silently landing in your records.
@@ -51,9 +40,20 @@ def _check_dates(occurred_on, due_date, txn_type):
         raise ValidationError(fields=errors)
 
 
+def overpayment_allowed(user_id) -> bool:
+    """Whether this account permits a payment larger than the balance.
+
+    A per-account setting rather than a constant: it is the user's call, and
+    the answer differs between someone tracking loose change with friends and
+    someone tracking four figures.
+    """
+    user = db.session.get(User, user_id)
+    return bool(user and user.allow_overpayment)
+
+
 def _check_overpayment(user_id, person, amount, exclude_transaction_id=None):
     """Reject a payment that exceeds what the person still owes."""
-    if ALLOW_OVERPAYMENT:
+    if overpayment_allowed(user_id):
         return
 
     totals = person_totals(user_id, person.id)
@@ -107,6 +107,10 @@ def create_transaction(
         note=note,
     )
     db.session.add(txn)
+    # flush assigns the id without committing, so the audit row can point at it
+    # and both land in the same database transaction.
+    db.session.flush()
+    audit_service.record(user_id, txn.id, AuditAction.CREATED)
     db.session.commit()
     return txn
 
@@ -135,13 +139,27 @@ def update_transaction(
     if txn_type == TransactionType.PAYMENT:
         _check_overpayment(user_id, person, amount, exclude_transaction_id=txn.id)
 
-    txn.person_id = person.id
+    # Captured before the mutation, so the audit can say what it used to be.
+    before = audit_service.snapshot(txn)
+
+    # Assigning the relationship rather than the raw person_id. Setting the
+    # foreign key alone leaves txn.person pointing at the OLD person until the
+    # instance is expired, so the audit snapshot taken afterwards would report
+    # no change at all.
+    txn.person = person
     txn.type = txn_type
     txn.amount = amount
     txn.occurred_on = occurred_on
     txn.due_date = due_date if txn_type == TransactionType.LOAN else None
     txn.payment_method = payment_method
     txn.note = note
+
+    db.session.flush()
+    changes = audit_service.diff(before, audit_service.snapshot(txn))
+    if changes:
+        # Saving a form without touching anything is not a change worth recording.
+        audit_service.record(user_id, txn.id, AuditAction.UPDATED, changes)
+
     db.session.commit()
     return txn
 
@@ -154,6 +172,7 @@ def delete_transaction(user_id, transaction_id) -> None:
     """
     txn = get_owned_transaction(user_id, transaction_id)
     txn.deleted_at = datetime.now(timezone.utc)
+    audit_service.record(user_id, txn.id, AuditAction.DELETED)
     db.session.commit()
 
 
@@ -190,6 +209,7 @@ def restore_transaction(user_id, transaction_id) -> Transaction:
         _check_overpayment(user_id, person, to_money(txn.amount))
 
     txn.deleted_at = None
+    audit_service.record(user_id, txn.id, AuditAction.RESTORED)
     db.session.commit()
     return txn
 

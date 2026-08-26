@@ -37,6 +37,14 @@ class User(UserMixin, db.Model):
     # additive migration.
     currency_code = db.Column(db.String(3), nullable=False, default="MYR")
 
+    # DESIGN DECISION (Q1, revised): whether a payment may exceed what is owed.
+    #
+    # Off by default, because an overpayment is usually a typo - an extra zero,
+    # or the wrong person picked - and rejecting it turns silent corruption into
+    # a visible error. Turn it on if you genuinely receive more than you are
+    # owed; the balance then goes negative and the person shows "In credit".
+    allow_overpayment = db.Column(db.Boolean, nullable=False, default=False)
+
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at = db.Column(
         db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
@@ -68,6 +76,7 @@ class User(UserMixin, db.Model):
             "email": self.email,
             "display_name": self.display_name,
             "currency_code": self.currency_code,
+            "allow_overpayment": self.allow_overpayment,
         }
 
     def __repr__(self):

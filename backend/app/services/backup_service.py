@@ -22,6 +22,7 @@ from ..errors import ConflictError, ValidationError
 from ..extensions import db
 from ..models import PAYMENT_METHODS, Person, Transaction, TransactionType
 from ..money import MAX_AMOUNT, ZERO, money_str, to_money
+from . import audit_service
 
 # Bumped only when the shape below changes in a way older files cannot satisfy.
 BACKUP_FORMAT = 1
@@ -234,7 +235,7 @@ def import_data(user, payload, mode="merge") -> dict:
             }
         )
 
-    _check_resulting_balances(clean_people, clean_transactions)
+    _check_resulting_balances(user, clean_people, clean_transactions)
 
     # ---------------- nothing raised, so it is safe to write ----------------
     if has_data:
@@ -246,6 +247,9 @@ def import_data(user, payload, mode="merge") -> dict:
         # identity map - and when SQLite hands a reused id to a newly inserted
         # person, the session finds two different objects claiming to be the same
         # row. Per-object deletes keep the session honest.
+        # Audit rows point at transactions, so they go first.
+        audit_service.clear_for_user(user.id)
+        db.session.flush()
         for txn in Transaction.query.filter_by(user_id=user.id).all():
             db.session.delete(txn)
         db.session.flush()
@@ -300,16 +304,16 @@ def import_data(user, payload, mode="merge") -> dict:
     }
 
 
-def _check_resulting_balances(clean_people, clean_transactions):
+def _check_resulting_balances(user, clean_people, clean_transactions):
     """Refuse a file that would leave someone owing a negative amount.
 
     A genuine backup can never do this - the app blocks overpayment on the way
     in. A hand-edited one can, and it is far better to reject the file than to
     import a state the rest of the app considers impossible.
     """
-    from .transaction_service import ALLOW_OVERPAYMENT
+    from .transaction_service import overpayment_allowed
 
-    if ALLOW_OVERPAYMENT:
+    if overpayment_allowed(user.id):
         return
 
     balances = {}
