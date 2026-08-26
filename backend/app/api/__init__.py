@@ -5,6 +5,7 @@ frontend's own routes (/people, /dashboard) once both are served together.
 """
 
 from .auth import auth_bp
+from .backup import backup_bp
 from .dashboard import dashboard_bp
 from .people import people_bp
 from .settings import settings_bp
@@ -16,4 +17,5 @@ ALL_BLUEPRINTS = (
     transactions_bp,
     dashboard_bp,
     settings_bp,
+    backup_bp,
 )
