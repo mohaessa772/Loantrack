@@ -1,0 +1,15 @@
+# Development and testing tools.
+#
+# Install locally with:  pip install -r requirements-dev.txt
+# (the -r line below pulls in the runtime dependencies as well)
+#
+# These are deliberately NOT installed on the production server. Every package
+# on a server is something that has to be kept patched, and a test runner has no
+# business being there.
+
+-r requirements.txt
+
+pytest==8.3.4
+iniconfig==2.3.0
+pluggy==1.6.0
+pyflakes==3.4.0

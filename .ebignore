@@ -1,0 +1,56 @@
+# What NOT to upload to Elastic Beanstalk.
+#
+# This file solves a specific trap. Without it, `eb deploy` packages whatever is
+# committed to git - and frontend/dist/ is in .gitignore, because a build
+# artifact does not belong in version control. The deploy would then arrive
+# WITHOUT the React build, and Flask would serve its "API is running" fallback
+# instead of your app.
+#
+# The moment .ebignore exists, EB stops consulting git entirely and packages the
+# working directory, filtered by the rules below. So dist/ ships because it is
+# not excluded here, while .env and your database still never leave the laptop.
+#
+# Anything listed below is EXCLUDED from the upload.
+
+# --- secrets and local data: must never leave this machine ---
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/instance/
+
+# --- installed packages: the server builds its own from requirements.txt ---
+.venv/
+backend/.venv/
+venv/
+node_modules/
+frontend/node_modules/
+
+# --- frontend SOURCE is not needed; only the built output in dist/ is ---
+frontend/src/
+frontend/public/
+frontend/index.html
+frontend/vite.config.js
+frontend/package.json
+frontend/package-lock.json
+
+# --- tests and dev tooling do not run on the server ---
+backend/tests/
+backend/pytest.ini
+backend/requirements-dev.txt
+
+# --- caches and build noise ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.vite/
+
+# --- version control and editors ---
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp

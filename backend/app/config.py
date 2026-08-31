@@ -89,6 +89,71 @@ class Config:
         return "dev-only-insecure-key-do-not-use-in-production"
 
 
+class ProductionConfig(Config):
+    """Settings for the deployed application.
+
+    Everything here is still read from the environment - this class changes
+    DEFAULTS and adds refusals, it does not hard-code anything. The point is
+    that a forgotten variable fails loudly instead of quietly running the app in
+    a development posture on the public internet.
+    """
+
+    ENV = "production"
+    DEBUG = False
+    TESTING = False
+
+    # Flask's JSON error pages, not the interactive debugger, under every
+    # circumstance. Belt and braces: run.py already refuses to start the
+    # development server when FLASK_ENV=production.
+    PROPAGATE_EXCEPTIONS = False
+
+    @staticmethod
+    def check(app):
+        """Fail fast, or at least complain loudly, at start-up.
+
+        Called once from create_app(). These are the mistakes that are silent
+        and expensive: an app that boots fine and is quietly insecure.
+        """
+        problems = []
+        warnings = []
+
+        uri = app.config["SQLALCHEMY_DATABASE_URI"]
+        if uri.startswith("sqlite"):
+            problems.append(
+                "DATABASE_URL is still SQLite. On Elastic Beanstalk the instance "
+                "filesystem is replaced on every deploy, so the database would "
+                "silently vanish. Point DATABASE_URL at your RDS PostgreSQL."
+            )
+
+        if not app.config.get("SECRET_KEY"):
+            problems.append("SECRET_KEY is not set.")
+
+        if not app.config["SESSION_COOKIE_SECURE"]:
+            # Deliberately a warning, not a refusal. Elastic Beanstalk hands you
+            # a plain http:// URL first; setting Secure before HTTPS exists
+            # means the browser silently refuses to send the session cookie and
+            # login appears broken with no error anywhere. Turn it on once the
+            # site is genuinely on HTTPS.
+            warnings.append(
+                "SESSION_COOKIE_SECURE is false. Set it to true once the site is "
+                "served over HTTPS, or session cookies will travel in the clear."
+            )
+
+        if app.config["ALLOW_REGISTRATION"]:
+            warnings.append(
+                "ALLOW_REGISTRATION is true - anyone who finds the URL can create "
+                "an account. Set it to false once your own account exists."
+            )
+
+        for message in warnings:
+            app.logger.warning("PRODUCTION CONFIG: %s", message)
+
+        if problems:
+            raise RuntimeError(
+                "Refusing to start in production:\n  - " + "\n  - ".join(problems)
+            )
+
+
 class TestConfig(Config):
     ENV = "testing"
     TESTING = True

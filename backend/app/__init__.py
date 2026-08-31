@@ -14,7 +14,7 @@ from flask_wtf.csrf import generate_csrf
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-from .config import Config, TestConfig
+from .config import Config, ProductionConfig, TestConfig
 from .errors import register_error_handlers
 from .extensions import cors, csrf, db, login_manager, migrate
 
@@ -43,12 +43,48 @@ def create_app(config_object=None):
         app.config["SECRET_KEY"] = "testing-key"
 
     _init_extensions(app)
+    _register_security_headers(app)
     _register_blueprints(app)
     register_error_handlers(app)
     _register_cli(app)
     _register_frontend(app)
 
+    # Production start-up check: refuses to boot on a misconfiguration that
+    # would be silent and expensive, and warns about the rest.
+    if config_object is ProductionConfig:
+        ProductionConfig.check(app)
+
     return app
+
+
+def _register_security_headers(app):
+    """Headers that tell the browser to be strict with our pages.
+
+    None of these change how the app works; they close off whole categories of
+    attack by declining browser behaviour we never want.
+
+    Deliberately NOT here:
+      Strict-Transport-Security - it tells a browser "only ever use HTTPS for
+        this host", cached for as long as it says. Sending it before HTTPS
+        actually works would lock you out of your own site.
+      Content-Security-Policy - worth adding, but it needs to be written
+        against the real page (Google Fonts, inline styles) and tested, or it
+        silently breaks the UI.
+    """
+
+    @app.after_request
+    def set_security_headers(response):
+        # Stop the browser guessing a response is HTML when we said it is JSON.
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        # Refuse to be embedded in a frame - blocks clickjacking.
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        # Do not leak the page someone came from to other sites.
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        # This app needs none of these device APIs.
+        response.headers.setdefault(
+            "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
+        )
+        return response
 
 
 def _init_extensions(app):

@@ -1,0 +1,10 @@
+# Elastic Beanstalk's Python platform installs from a requirements.txt at the
+# APPLICATION ROOT - this file. The real list lives in backend/, so there is
+# only ever one place to edit dependencies.
+#
+# pip resolves a -r path relative to the file containing it, so this pulls in
+# backend/requirements.txt exactly as if you had run it from that folder.
+#
+# Development tools are NOT included: the server installs runtime only.
+
+-r backend/requirements.txt
