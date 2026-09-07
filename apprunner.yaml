@@ -1,0 +1,49 @@
+# How AWS App Runner builds and starts this application from GitHub.
+#
+# App Runner clones the repository, runs the build commands, then runs the
+# start command and puts an HTTPS URL in front of it. This file is what tells
+# it how - without it, App Runner has no idea this is a Flask app.
+#
+# Secrets are deliberately NOT in this file. It is committed to GitHub, so
+# SECRET_KEY and DATABASE_URL are set in the App Runner console instead, where
+# they are stored encrypted and never appear in your repository.
+
+version: 1.0
+runtime: python3
+
+build:
+  commands:
+    build:
+      # Installs from requirements.txt at the repository root, which is a
+      # one-line pointer to backend/requirements.txt. Runtime packages only -
+      # pytest and the other dev tools are in requirements-dev.txt and never
+      # reach the server.
+      - pip install -r requirements.txt
+
+run:
+  runtime-version: 3.11
+
+  # Gunicorn, not Flask's development server. Flask's own server handles one
+  # request at a time and can print tracebacks to the browser; Gunicorn runs
+  # several worker processes and does neither.
+  #
+  #   --chdir backend   changes into backend/ and puts it on the import path,
+  #                     so `run:app` resolves while the repository root stays
+  #                     the application root.
+  #   --bind :8080      the port App Runner expects (see network.port below).
+  #   --workers 2       two worker processes. App Runner's smallest instance
+  #                     has 1 vCPU / 2 GB, and each worker carries its own
+  #                     database connection pool.
+  #   --timeout 60      kill a worker stuck on one request for a minute.
+  #   --access-logfile - send logs to stdout, where CloudWatch collects them.
+  command: gunicorn --chdir backend --bind :8080 --workers 2 --timeout 60 --access-logfile - --error-logfile - run:app
+
+  network:
+    port: 8080
+
+  env:
+    # Safe to commit: this only selects the production configuration. It is
+    # what makes the app refuse to run on SQLite, refuse the development
+    # server, and turn the debugger off.
+    - name: FLASK_ENV
+      value: production

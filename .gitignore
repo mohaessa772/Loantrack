@@ -1,12 +1,28 @@
-# --- Secrets ---------------------------------------------------------
-# The single most important line in this file. .env holds SECRET_KEY and the
-# database password. Committing it - even to a private repo - is how real
-# credential leaks happen.
+# What Git must never carry to GitHub.
+#
+# Nothing here is deleted from your computer - .gitignore only decides what
+# gets committed. Your .env and your SQLite database stay exactly where they
+# are; they simply never leave the machine.
+
+# --- SECRETS -----------------------------------------------------------
+# The single most important block in this file. .env holds SECRET_KEY and,
+# in other setups, database passwords. Committing it - even to a private
+# repository - is how real credential leaks happen.
 .env
 .env.*
 !.env.example
 
-# --- Python ----------------------------------------------------------
+# --- LOCAL DATABASE ----------------------------------------------------
+# Your development database and every backup beside it. This is test data,
+# it belongs on your laptop, and production starts from an empty PostgreSQL
+# database instead.
+*.db
+*.sqlite
+*.sqlite3
+instance/
+backend/instance/
+
+# --- PYTHON ------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -16,20 +32,35 @@ venv/
 .coverage
 htmlcov/
 
-# --- Local database --------------------------------------------------
-*.db
-*.sqlite
-*.sqlite3
-instance/
-
-# --- Node / frontend -------------------------------------------------
+# --- NODE --------------------------------------------------------------
+# Thousands of downloaded files, rebuilt from package-lock.json with
+# `npm install`. Never commit them.
 node_modules/
-dist/
-dist-ssr/
-*.local
-.vite/
 
-# --- Editors / OS ----------------------------------------------------
+# --- BUILD OUTPUT ------------------------------------------------------
+# NOTE the deliberate exception below.
+#
+# frontend/dist IS committed. Normally a build artifact does not belong in
+# version control - but AWS builds this project FROM GitHub, and the Python
+# runtime there has no Node.js, so it cannot run `vite build` itself. If the
+# built files were not in the repository, the deployed site would have a
+# working API and no user interface at all.
+#
+# The trade-off: you must rebuild the frontend and commit it whenever you
+# change anything under frontend/src.
+#
+# (The cleaner alternative is a multi-stage Docker build that compiles the
+# frontend on AWS. That removes this exception at the cost of learning
+# Docker - a fair trade later, unnecessary complexity now.)
+dist-ssr/
+build/
+.vite/
+*.local
+
+# --- LOGS --------------------------------------------------------------
+*.log
+
+# --- EDITORS / OS ------------------------------------------------------
 .vscode/*
 !.vscode/extensions.json
 .idea/
