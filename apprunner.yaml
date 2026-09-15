@@ -1,49 +1,102 @@
 # How AWS App Runner builds and starts this application from GitHub.
 #
-# App Runner clones the repository, runs the build commands, then runs the
-# start command and puts an HTTPS URL in front of it. This file is what tells
-# it how - without it, App Runner has no idea this is a Flask app.
+# This file follows the "revised App Runner build", which is the build process
+# AWS applies to the Python 3.11 runtime. Python 3.7 and 3.8 reached end of
+# support on 1 December 2025, so 3.11 is the supported Python runtime and the
+# revised build is not optional.
 #
 # Secrets are deliberately NOT in this file. It is committed to GitHub, so
 # SECRET_KEY and DATABASE_URL are set in the App Runner console instead, where
 # they are stored encrypted and never appear in your repository.
+#
+# NOT configurable here: the health check path. App Runner takes that from the
+# console / API, not from this file. Set it to /api/health when you create the
+# service, or App Runner falls back to a TCP check that only proves something
+# is listening - not that Flask is actually answering.
 
 version: 1.0
-runtime: python3
+
+# Python 3.11 has its OWN runtime identifier. It is NOT "python3" with a
+# version pinned underneath: the naming convention is <language><major
+# version>, and choosing "python3" selects the original build process, which
+# behaves differently from everything below.
+runtime: python311
 
 build:
   commands:
     build:
-      # Installs from requirements.txt at the repository root, which is a
-      # one-line pointer to backend/requirements.txt. Runtime packages only -
-      # pytest and the other dev tools are in requirements-dev.txt and never
-      # reach the server.
-      - pip install -r requirements.txt
+      # pip3, not pip: the 3.11 runtime image exposes the interpreter and the
+      # installer as python3 / pip3.
+      #
+      # This install is for the BUILD stage. It does not survive into the
+      # running container - see the pre-run note below for why - but it is
+      # worth keeping: a typo or an unresolvable pin fails the build here,
+      # loudly, instead of crash-looping the container at start-up.
+      - pip3 install -r requirements.txt
 
 run:
-  runtime-version: 3.11
+  # Quoted on purpose. Unquoted, YAML reads 3.11 as a decimal NUMBER rather
+  # than text. It survives the round trip, but 3.10 would become the number
+  # 3.1 and App Runner would be asked for a Python that does not exist.
+  runtime-version: "3.11"
+
+  pre-run:
+    # THIS is the install that actually matters, and it is the single most
+    # important line in the file.
+    #
+    # The revised build is a Docker multi-stage build. Only the /app directory
+    # is carried from the build stage into the final run image - and pip
+    # installs packages into site-packages, which lives OUTSIDE /app. So
+    # everything the build stage installed (Flask, SQLAlchemy, Gunicorn) is
+    # discarded when the run image is packaged.
+    #
+    # pre-run commands execute during the packaging stage, on the run image
+    # itself, so this is what puts the dependencies where the container can
+    # actually reach them. Without it the build succeeds and the service then
+    # fails at start-up with "gunicorn: command not found".
+    #
+    # requirements.txt at /app is a one-line pointer to
+    # backend/requirements.txt; pip resolves a -r path relative to the file
+    # containing it, so this pulls in the real 23-package list. Runtime only -
+    # pytest and the other dev tools live in requirements-dev.txt.
+    - pip3 install -r requirements.txt
 
   # Gunicorn, not Flask's development server. Flask's own server handles one
   # request at a time and can print tracebacks to the browser; Gunicorn runs
   # several worker processes and does neither.
   #
-  #   --chdir backend   changes into backend/ and puts it on the import path,
-  #                     so `run:app` resolves while the repository root stays
-  #                     the application root.
-  #   --bind :8080      the port App Runner expects (see network.port below).
-  #   --workers 2       two worker processes. App Runner's smallest instance
-  #                     has 1 vCPU / 2 GB, and each worker carries its own
-  #                     database connection pool.
-  #   --timeout 60      kill a worker stuck on one request for a minute.
-  #   --access-logfile - send logs to stdout, where CloudWatch collects them.
-  command: gunicorn --chdir backend --bind :8080 --workers 2 --timeout 60 --access-logfile - --error-logfile - run:app
+  #   --chdir backend      /app is the working directory in every stage, so
+  #                        this lands in /app/backend and puts it on the
+  #                        import path - which is what makes "run:app"
+  #                        resolve while /app stays the application root.
+  #   --bind 0.0.0.0:8080  listen on every interface. This must NOT be
+  #                        127.0.0.1: App Runner reaches the container from
+  #                        outside it, and a loopback-only bind is the classic
+  #                        cause of a service that builds fine and then fails
+  #                        its health check forever.
+  #   --workers 2          two worker processes. App Runner's smallest
+  #                        instance is 1 vCPU / 2 GB, and each worker carries
+  #                        its own database connection pool.
+  #   --timeout 60         kill a worker stuck on one request for a minute.
+  #   --access-logfile -   send logs to stdout, where CloudWatch collects them.
+  command: gunicorn --chdir backend --bind 0.0.0.0:8080 --workers 2 --timeout 60 --access-logfile - --error-logfile - run:app
 
   network:
+    # Must match the port in --bind above. This is what App Runner routes
+    # incoming HTTPS traffic to.
     port: 8080
 
   env:
     # Safe to commit: this only selects the production configuration. It is
     # what makes the app refuse to run on SQLite, refuse the development
     # server, and turn the debugger off.
+    #
+    # It must be set here rather than only in the console, because config.py
+    # reads FLASK_ENV at import time - before Flask itself starts.
+    #
+    # Note: these run-section variables are visible to the RUNNING container,
+    # not to the pre-run commands above. AWS is explicit about that. The
+    # pre-run install needs no environment variables, so it does not matter
+    # here - but do not move build configuration into this section.
     - name: FLASK_ENV
       value: production
